@@ -1,0 +1,82 @@
+module vgaoutput(
+   input        CLOCK_50,
+   output wire [9:0] LEDR,
+   output reg [7:0] VGA_R,
+   output reg [7:0] VGA_G,
+   output reg [7:0] VGA_B,
+   output wire       VGA_HS,
+   output wire       VGA_VS,
+   output wire       VGA_CLK,
+   output wire       VGA_SYNC_N,
+   output wire       VGA_BLANK_N,
+   output wire [35:0] GPIO_0
+);
+   //HSYNC parameters
+   parameter  sy_hs = 96;
+   parameter  bp_hs = 48 + sy_hs;
+   parameter  di_hs = 640 + bp_hs;
+   parameter  fp_hs = 16 + di_hs; 
+   parameter  di_4  = 160;
+
+   //VSYNC parameter
+   parameter  sy_vs = 2;
+   parameter  bp_vs = 33 + sy_vs;
+   parameter  di_vs = 480 + bp_vs;
+   parameter  fp_vs = 10 + di_vs;
+
+   assign LEDR = 10'h00;
+   assign GPIO_0[0] = VGA_HS;
+   assign GPIO_0[1] = VGA_VS;
+
+   reg vgahs = 1'b0;
+   reg vgavs = 1'b0;
+   reg[9:0] hs_cnt = 10'd0;
+   reg[9:0] vs_cnt = 10'd0;
+
+   assign VGA_HS = vgahs;
+   assign VGA_VS = vgavs;
+   
+   //VGA clock
+   reg vga_clk;
+   always @(posedge CLOCK_50) begin
+ vga_clk = ~vga_clk;
+   end
+   assign VGA_CLK = CLOCK_50; //DAC clock
+   assign VGA_SYNC_N = 1;
+   assign VGA_BLANK_N = 1;
+ 
+   //HSYNC counter
+   always @(posedge vga_clk) begin
+ if(hs_cnt == fp_hs) hs_cnt = 10'd0;
+ else    hs_cnt = hs_cnt + 1'd1;
+   end
+
+   always @(posedge vga_clk) begin
+  if(hs_cnt < sy_hs) vgahs = 0;
+ else   vgahs = 1;
+   end
+
+   //Output sawtooth wave of each RGB 
+   always @(posedge vga_clk) begin
+ if((vgahs == 1) && (hs_cnt > bp_hs) && (hs_cnt < di_hs)) begin
+  if(hs_cnt < (bp_hs+di_4) )   begin VGA_B=VGA_B+1'd1; VGA_G=1'd0; VGA_R=1'd0; end
+  else if(hs_cnt < (bp_hs+di_4+di_4))   begin VGA_B=1'd0; VGA_G=VGA_G+1'd1; VGA_R=1'd0; end
+  else if(hs_cnt < (bp_hs+di_4+di_4+di_4))  begin VGA_B=1'd0; VGA_G=1'd0; VGA_R=VGA_R+1'd1; end
+  else if(hs_cnt == (bp_hs+di_4+di_4+di_4))       begin VGA_B=1'd0; VGA_G=1'd0; VGA_R=1'd0; end
+  else       begin VGA_B=VGA_B+1'd1; VGA_G=VGA_G+1'd1; VGA_R=VGA_R+1'd1; end
+ end
+ else begin VGA_B=0; VGA_G=0; VGA_R=0; end
+ end
+ 
+   //VSYNC counter
+   always @(posedge vgahs) begin
+ if(vs_cnt == fp_vs) vs_cnt = 10'd0;
+ else    vs_cnt = vs_cnt + 1'd1;
+   end  
+
+   always @(posedge vgahs) begin
+ if(vs_cnt < sy_vs) vgavs = 0;
+ else   vgavs = 1;
+   end 
+ 
+endmodule
